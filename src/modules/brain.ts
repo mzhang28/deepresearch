@@ -20,7 +20,6 @@ export class BrainModule {
     summaries: DocumentSummary[],
   ): Promise<ResearchOutline> {
     const response = await this.llm.chatFormat({
-      model: "o1",
       messages: [
         {
           role: "system",
@@ -64,7 +63,6 @@ export class BrainModule {
     query: ResearchQuery,
   ): Promise<string> {
     const response = await this.llm.chat({
-      model: "o3-mini",
       messages: [
         {
           role: "system",
@@ -104,7 +102,6 @@ export class BrainModule {
     outline: ResearchOutline,
   ): Promise<string> {
     const response = await this.llm.chat({
-      model: "o3-mini",
       messages: [
         {
           role: "system",

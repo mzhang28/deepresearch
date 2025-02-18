@@ -7,7 +7,7 @@ import {
 } from "../types";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { usageTracker } from "../utils";
-import { LLMInterface } from "../llm";
+import { LLMInterface, OLLAMA_CONTENT_LIMIT } from "../llm";
 
 export class SummarizationModule {
   constructor(private llm: LLMInterface) {}
@@ -18,7 +18,6 @@ export class SummarizationModule {
     query: ResearchQuery,
   ): Promise<DocumentSummary | null> {
     const response = await this.llm.chatFormat({
-      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -41,23 +40,23 @@ export class SummarizationModule {
             Research Angle: ${query.angle || "General overview"}
             URL: ${url}
             Date / Time Right Now: ${new Date().toISOString()}
-            Content to analyze:\n${content.slice(0, 120_000)}`, // Limit content length
+            Content to analyze:\n${content.slice(0, OLLAMA_CONTENT_LIMIT)}`, // Limit content length
         },
       ],
       format: DocumentSummarySchema,
     });
 
-    usageTracker.trackUsage({
-      model: "gpt-4o-mini",
-      tokens: {
-        prompt_tokens: response.usage?.prompt_tokens || 0,
-        completion_tokens: response.usage?.completion_tokens || 0,
-        total_tokens: response.usage?.total_tokens || 0,
-      },
-      module: "summarization",
-      operation: "summarizeContent",
-      timestamp: new Date(),
-    });
+    // usageTracker.trackUsage({
+    //   model: "gpt-4o-mini",
+    //   tokens: {
+    //     prompt_tokens: response.usage?.prompt_tokens || 0,
+    //     completion_tokens: response.usage?.completion_tokens || 0,
+    //     total_tokens: response.usage?.total_tokens || 0,
+    //   },
+    //   module: "summarization",
+    //   operation: "summarizeContent",
+    //   timestamp: new Date(),
+    // });
 
     return {
       ...response.content,
@@ -72,11 +71,16 @@ export class SummarizationModule {
   ): Promise<DocumentSummary[]> {
     console.log(`\n\nSummarizing ${documents.length} documents:`);
     console.log(JSON.stringify(documents, null, 2));
-    const summaries = await Promise.all(
-      documents.map(async (doc) => {
-        return this.summarizeContent(doc.content, doc.url, query);
-      }),
-    );
+
+    // const summaries = await Promise.all(
+    //   documents.map(async (doc) => {
+    //     return this.summarizeContent(doc.content, doc.url, query);
+    //   }),
+    // );
+    const summaries = [];
+    for (const doc of documents) {
+      summaries.push(await this.summarizeContent(doc.content, doc.url, query));
+    }
 
     // Filter out null results and sort by relevance
     return summaries

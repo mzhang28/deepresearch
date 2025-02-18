@@ -4,6 +4,8 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import ollama from "ollama";
 import zodToJsonSchema from "zod-to-json-schema";
 
+export const OLLAMA_CONTENT_LIMIT = 1000;
+
 export interface Request {
   model?: string;
   messages: RequestMessage[];
@@ -39,6 +41,7 @@ export class Ollama implements LLMInterface {
     const response = await ollama.chat({
       model: r.model ?? this.options.model,
       messages: r.messages,
+      options: { num_ctx: OLLAMA_CONTENT_LIMIT + 1000 },
     });
     return { content: response.message.content, usage: null };
   }
@@ -47,6 +50,7 @@ export class Ollama implements LLMInterface {
     const response = await ollama.chat({
       model: r.model ?? this.options.model,
       messages: r.messages,
+      options: { num_ctx: OLLAMA_CONTENT_LIMIT + 1000 },
       format: zodToJsonSchema(r.format),
     });
     return {

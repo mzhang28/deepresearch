@@ -40,3 +40,5 @@ logs/
 .tmp/
 tmp/
 temp/
+
+logs.txt
