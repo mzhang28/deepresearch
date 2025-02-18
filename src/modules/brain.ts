@@ -10,17 +10,17 @@ import {
   ResearchReport,
 } from "../types";
 import { usageTracker } from "../utils";
+import { LLMInterface } from "../llm";
 
 export class BrainModule {
-  constructor(private openai: OpenAI) {}
+  constructor(private llm: LLMInterface) {}
 
   private async generateOutline(
     query: ResearchQuery,
-    summaries: DocumentSummary[]
+    summaries: DocumentSummary[],
   ): Promise<ResearchOutline> {
-    const response = await this.openai.beta.chat.completions.parse({
+    const response = await this.llm.chatFormat({
       model: "o1",
-      reasoning_effort: "high",
       messages: [
         {
           role: "system",
@@ -32,43 +32,39 @@ export class BrainModule {
           role: "user",
           content: `Research Query: ${JSON.stringify(query, null, 2)}
           Available Documents: ${JSON.stringify(summaries, null, 2)}
-          
+
           Create a structured outline for the research report.`,
         },
       ],
-      response_format: zodResponseFormat(
-        ResearchOutlineSchema,
-        "ResearchOutline"
-      ),
+      format: ResearchOutlineSchema,
     });
 
-    usageTracker.trackUsage({
-      model: "o1",
-      tokens: {
-        prompt_tokens: response.usage?.prompt_tokens || 0,
-        completion_tokens: response.usage?.completion_tokens || 0,
-        total_tokens: response.usage?.total_tokens || 0,
-      },
-      module: "brain",
-      operation: "generateOutline",
-      timestamp: new Date(),
-    });
+    // usageTracker.trackUsage({
+    //   model: "o1",
+    //   tokens: {
+    //     prompt_tokens: response.usage?.prompt_tokens || 0,
+    //     completion_tokens: response.usage?.completion_tokens || 0,
+    //     total_tokens: response.usage?.total_tokens || 0,
+    //   },
+    //   module: "brain",
+    //   operation: "generateOutline",
+    //   timestamp: new Date(),
+    // });
 
-    const parsed = response.choices[0].message.parsed;
+    // const parsed = response.choices[0].message.parsed;
 
-    if (!parsed) throw new Error("No outline generated");
+    // if (!parsed) throw new Error("No outline generated");
 
-    return parsed;
+    return response.content;
   }
 
   private async generateSectionContent(
     section: string,
     relevantDocs: DocumentSummary[],
-    query: ResearchQuery
+    query: ResearchQuery,
   ): Promise<string> {
-    const response = await this.openai.chat.completions.create({
+    const response = await this.llm.chat({
       model: "o3-mini",
-      reasoning_effort: "high",
       messages: [
         {
           role: "system",
@@ -81,34 +77,34 @@ export class BrainModule {
           content: `Section: ${section}
           Research Query: ${JSON.stringify(query, null, 2)}
           Relevant Documents: ${JSON.stringify(relevantDocs, null, 2)}
-          
+
           Write a comprehensive section for the research report. No preamble or postamble, just the section content.`,
         },
       ],
     });
 
-    usageTracker.trackUsage({
-      model: "o3-mini",
-      tokens: {
-        prompt_tokens: response.usage?.prompt_tokens || 0,
-        completion_tokens: response.usage?.completion_tokens || 0,
-        total_tokens: response.usage?.total_tokens || 0,
-      },
-      module: "brain",
-      operation: "generateSectionContent",
-      timestamp: new Date(),
-    });
+    // usageTracker.trackUsage({
+    //   model: "o3-mini",
+    //   tokens: {
+    //     prompt_tokens: response.usage?.prompt_tokens || 0,
+    //     completion_tokens: response.usage?.completion_tokens || 0,
+    //     total_tokens: response.usage?.total_tokens || 0,
+    //   },
+    //   module: "brain",
+    //   operation: "generateSectionContent",
+    //   timestamp: new Date(),
+    // });
 
-    return response.choices[0].message.content ?? "";
+    // return response.choices[0].message.content ?? "";
+    return response.content;
   }
 
   private async generateIntroduction(
     query: ResearchQuery,
-    outline: ResearchOutline
+    outline: ResearchOutline,
   ): Promise<string> {
-    const response = await this.openai.chat.completions.create({
+    const response = await this.llm.chat({
       model: "o3-mini",
-      reasoning_effort: "high",
       messages: [
         {
           role: "system",
@@ -119,34 +115,33 @@ export class BrainModule {
           role: "user",
           content: `Research Query: ${JSON.stringify(query, null, 2)}
           Report Outline: ${JSON.stringify(outline, null, 2)}
-          
+
           Write an engaging introduction that sets up the research report.`,
         },
       ],
     });
 
-    usageTracker.trackUsage({
-      model: "o3-mini",
-      tokens: {
-        prompt_tokens: response.usage?.prompt_tokens || 0,
-        completion_tokens: response.usage?.completion_tokens || 0,
-        total_tokens: response.usage?.total_tokens || 0,
-      },
-      module: "brain",
-      operation: "generateIntroduction",
-      timestamp: new Date(),
-    });
+    // usageTracker.trackUsage({
+    //   model: "o3-mini",
+    //   tokens: {
+    //     prompt_tokens: response.usage?.prompt_tokens || 0,
+    //     completion_tokens: response.usage?.completion_tokens || 0,
+    //     total_tokens: response.usage?.total_tokens || 0,
+    //   },
+    //   module: "brain",
+    //   operation: "generateIntroduction",
+    //   timestamp: new Date(),
+    // });
 
-    return response.choices[0].message.content ?? "";
+    // return response.choices[0].message.content ?? "";
+    return response.content;
   }
 
   private async generateConclusion(
     query: ResearchQuery,
-    sections: Array<{ heading: string; content: string }>
+    sections: Array<{ heading: string; content: string }>,
   ): Promise<string> {
-    const response = await this.openai.chat.completions.create({
-      model: "o3-mini",
-      reasoning_effort: "high",
+    const response = await this.llm.chat({
       messages: [
         {
           role: "system",
@@ -157,30 +152,31 @@ export class BrainModule {
           role: "user",
           content: `Research Query: ${JSON.stringify(query, null, 2)}
           Report Sections: ${JSON.stringify(sections, null, 2)}
-          
+
           Write a conclusion that synthesizes the key findings and insights.`,
         },
       ],
     });
 
-    usageTracker.trackUsage({
-      model: "o3-mini",
-      tokens: {
-        prompt_tokens: response.usage?.prompt_tokens || 0,
-        completion_tokens: response.usage?.completion_tokens || 0,
-        total_tokens: response.usage?.total_tokens || 0,
-      },
-      module: "brain",
-      operation: "generateConclusion",
-      timestamp: new Date(),
-    });
+    // usageTracker.trackUsage({
+    //   model: "o3-mini",
+    //   tokens: {
+    //     prompt_tokens: response.usage?.prompt_tokens || 0,
+    //     completion_tokens: response.usage?.completion_tokens || 0,
+    //     total_tokens: response.usage?.total_tokens || 0,
+    //   },
+    //   module: "brain",
+    //   operation: "generateConclusion",
+    //   timestamp: new Date(),
+    // });
 
-    return response.choices[0].message.content ?? "";
+    // return response.choices[0].message.content ?? "";
+    return response.content;
   }
 
   async generateReport(
     query: ResearchQuery,
-    summaries: DocumentSummary[]
+    summaries: DocumentSummary[],
   ): Promise<ResearchReport> {
     // Generate outline
     const outline = await this.generateOutline(query, summaries);
@@ -192,19 +188,19 @@ export class BrainModule {
     const sections = await Promise.all(
       outline.sections.map(async (section) => {
         const relevantDocs = summaries.filter((s) =>
-          section.relevantDocuments.includes(s.url)
+          section.relevantDocuments.includes(s.url),
         );
         const content = await this.generateSectionContent(
           section.heading,
           relevantDocs,
-          query
+          query,
         );
         return {
           heading: section.heading,
           content,
           sources: section.relevantDocuments,
         };
-      })
+      }),
     );
 
     // Generate conclusion

@@ -6,13 +6,13 @@ import {
 } from "../types";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { askQuestion, usageTracker } from "../utils";
+import { LLMInterface } from "../llm";
 
 export class ClarificationModule {
-  constructor(private openai: OpenAI) {}
+  constructor(private llm: LLMInterface) {}
 
   private async getClarifyingQuestions(topic: string): Promise<string[]> {
-    const response = await this.openai.beta.chat.completions.parse({
-      model: "gpt-4o",
+    const response = await this.llm.chatFormat({
       messages: [
         {
           role: "system",
@@ -24,38 +24,35 @@ export class ClarificationModule {
           content: `Initial user query: ${topic}\nGenerate clarifying questions for the user so we can better understand their research needs. Make sure to note your chain of thought as you are generating the questions.`,
         },
       ],
-      response_format: zodResponseFormat(
-        ClarifyingQuestionsSchema,
-        "ClarifyingQuestions"
-      ),
+      format: ClarifyingQuestionsSchema,
     });
 
-    usageTracker.trackUsage({
-      model: "gpt-4o",
-      tokens: {
-        prompt_tokens: response.usage?.prompt_tokens || 0,
-        completion_tokens: response.usage?.completion_tokens || 0,
-        total_tokens: response.usage?.total_tokens || 0,
-      },
-      module: "clarification",
-      operation: "getClarifyingQuestions",
-      timestamp: new Date(),
-    });
+    // usageTracker.trackUsage({
+    //   model: "gpt-4o",
+    //   tokens: {
+    //     prompt_tokens: response.usage?.prompt_tokens || 0,
+    //     completion_tokens: response.usage?.completion_tokens || 0,
+    //     total_tokens: response.usage?.total_tokens || 0,
+    //   },
+    //   module: "clarification",
+    //   operation: "getClarifyingQuestions",
+    //   timestamp: new Date(),
+    // });
 
-    const questions = response.choices[0].message.parsed?.questions;
-    if (!questions) {
-      throw new Error("No questions generated");
-    }
-    return questions;
+    // const questions = response.choices[0].message.parsed?.questions;
+    // if (!questions) {
+    //   throw new Error("No questions generated");
+    // }
+    // return questions;
+    return response.content.questions;
   }
 
   private async processAnswer(
     topic: string,
     question: string,
-    answer: string
+    answer: string,
   ): Promise<ResearchQuery> {
-    const response = await this.openai.beta.chat.completions.parse({
-      model: "o3-mini",
+    const response = await this.llm.chatFormat({
       messages: [
         {
           role: "system",
@@ -67,28 +64,29 @@ export class ClarificationModule {
           content: `Topic: ${topic}\nQuestion: ${question}\nAnswer: ${answer}\n\nExtract research parameters in JSON format matching the ResearchQuery type.`,
         },
       ],
-      response_format: zodResponseFormat(ResearchQuerySchema, "ResearchQuery"),
+      format: ResearchQuerySchema,
     });
 
-    usageTracker.trackUsage({
-      model: "o3-mini",
-      tokens: {
-        prompt_tokens: response.usage?.prompt_tokens || 0,
-        completion_tokens: response.usage?.completion_tokens || 0,
-        total_tokens: response.usage?.total_tokens || 0,
-      },
-      module: "clarification",
-      operation: "processAnswer",
-      timestamp: new Date(),
-    });
+    // usageTracker.trackUsage({
+    //   model: "o3-mini",
+    //   tokens: {
+    //     prompt_tokens: response.usage?.prompt_tokens || 0,
+    //     completion_tokens: response.usage?.completion_tokens || 0,
+    //     total_tokens: response.usage?.total_tokens || 0,
+    //   },
+    //   module: "clarification",
+    //   operation: "processAnswer",
+    //   timestamp: new Date(),
+    // });
 
-    const parsed = response.choices[0].message.parsed;
-    if (!parsed) {
-      throw new Error(
-        "No parsed response in `ClarificationModule.processAnswer`"
-      );
-    }
-    return parsed;
+    // const parsed = response.choices[0].message.parsed;
+    // if (!parsed) {
+    //   throw new Error(
+    //     "No parsed response in `ClarificationModule.processAnswer`",
+    //   );
+    // }
+    // return parsed;
+    return response.content;
   }
 
   async clarifyQuery(initialTopic: string): Promise<ResearchQuery> {

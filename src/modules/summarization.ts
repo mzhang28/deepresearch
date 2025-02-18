@@ -7,16 +7,17 @@ import {
 } from "../types";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { usageTracker } from "../utils";
+import { LLMInterface } from "../llm";
 
 export class SummarizationModule {
-  constructor(private openai: OpenAI) {}
+  constructor(private llm: LLMInterface) {}
 
   private async summarizeContent(
     content: string,
     url: string,
-    query: ResearchQuery
+    query: ResearchQuery,
   ): Promise<DocumentSummary | null> {
-    const response = await this.openai.beta.chat.completions.parse({
+    const response = await this.llm.chatFormat({
       model: "gpt-4o-mini",
       messages: [
         {
@@ -31,7 +32,7 @@ export class SummarizationModule {
               "extractedAt": "ISO 8601 timestamp of when the content was extracted",
               "url": "URL of the page"
             }
-            
+
             If the content is not relevant (relevanceScore < 0.3) or appears to be spam/low quality, return null.`,
         },
         {
@@ -43,10 +44,7 @@ export class SummarizationModule {
             Content to analyze:\n${content.slice(0, 120_000)}`, // Limit content length
         },
       ],
-      response_format: zodResponseFormat(
-        DocumentSummarySchema,
-        "DocumentSummary"
-      ),
+      format: DocumentSummarySchema,
     });
 
     usageTracker.trackUsage({
@@ -61,14 +59,8 @@ export class SummarizationModule {
       timestamp: new Date(),
     });
 
-    const parsed = response.choices[0].message.parsed;
-    if (!parsed) {
-      console.error("No parsed summary returned");
-      return null;
-    }
-
     return {
-      ...parsed,
+      ...response.content,
       extractedAt: new Date(),
       url,
     };
@@ -76,14 +68,14 @@ export class SummarizationModule {
 
   async processBatch(
     documents: Array<{ url: string; content: string }>,
-    query: ResearchQuery
+    query: ResearchQuery,
   ): Promise<DocumentSummary[]> {
     console.log(`\n\nSummarizing ${documents.length} documents:`);
     console.log(JSON.stringify(documents, null, 2));
     const summaries = await Promise.all(
       documents.map(async (doc) => {
         return this.summarizeContent(doc.content, doc.url, query);
-      })
+      }),
     );
 
     // Filter out null results and sort by relevance

@@ -2,12 +2,14 @@ import { config } from "dotenv";
 import { openai, hbClient } from "./client";
 import { ResearchOrchestrator } from "./orchestrator";
 import { closeReadline } from "./utils";
+import { Ollama } from "./llm";
 
 config();
 
 async function main() {
   try {
-    const orchestrator = new ResearchOrchestrator(openai, hbClient);
+    const llm = new Ollama({ model: "llama3.1" });
+    const orchestrator = new ResearchOrchestrator(llm, hbClient);
 
     // Example usage
     const topic =
@@ -39,7 +41,7 @@ async function main() {
     console.log("Number of sources used:", report.metadata.sourcesUsed.length);
     console.log(
       "Usage Metrics:",
-      JSON.stringify(report.metadata.usageMetrics, null, 2)
+      JSON.stringify(report.metadata.usageMetrics, null, 2),
     );
   } catch (error) {
     console.error("Error in research process:", error);

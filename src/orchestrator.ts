@@ -6,6 +6,7 @@ import { SummarizationModule } from "./modules/summarization";
 import { BrainModule } from "./modules/brain";
 import { ResearchQuery, ResearchReport, ResearchState } from "./types";
 import { usageTracker } from "./utils";
+import { LLMInterface } from "./llm";
 
 export class ResearchOrchestrator {
   private clarificationModule: ClarificationModule;
@@ -15,13 +16,13 @@ export class ResearchOrchestrator {
   private state: ResearchState | null = null;
 
   constructor(
-    private openai: OpenAI,
-    private hbClient: InstanceType<typeof Hyperbrowser>
+    private llm: LLMInterface,
+    private hbClient: InstanceType<typeof Hyperbrowser>,
   ) {
-    this.clarificationModule = new ClarificationModule(openai);
-    this.searchModule = new SearchModule(hbClient, openai);
-    this.summarizationModule = new SummarizationModule(openai);
-    this.brainModule = new BrainModule(openai);
+    this.clarificationModule = new ClarificationModule(llm);
+    this.searchModule = new SearchModule(hbClient, llm);
+    this.summarizationModule = new SummarizationModule(llm);
+    this.brainModule = new BrainModule(llm);
   }
 
   private saveState(newState: Partial<ResearchState>) {
@@ -62,9 +63,8 @@ export class ResearchOrchestrator {
 
       // 1. Clarification stage
       console.log("Starting clarification stage...");
-      const refinedQuery = await this.clarificationModule.clarifyQuery(
-        initialTopic
-      );
+      const refinedQuery =
+        await this.clarificationModule.clarifyQuery(initialTopic);
       this.saveState({ query: refinedQuery, stage: "search" });
       this.createCheckpoint();
 
@@ -83,7 +83,7 @@ export class ResearchOrchestrator {
       console.log("Starting summarization stage...");
       const documentSummaries = await this.summarizationModule.processBatch(
         searchResults,
-        refinedQuery
+        refinedQuery,
       );
       this.saveState({ documentSummaries, stage: "outline" });
 
@@ -103,7 +103,7 @@ export class ResearchOrchestrator {
       console.log("Generating final report...");
       const report = await this.brainModule.generateReport(
         refinedQuery,
-        documentSummaries
+        documentSummaries,
       );
 
       // Add usage metrics to the report

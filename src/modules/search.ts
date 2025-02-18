@@ -11,17 +11,16 @@ import {
   Usage,
 } from "../types";
 import { usageTracker } from "../utils";
+import { LLMInterface } from "../llm";
 
 export class SearchModule {
   constructor(
     private hbClient: InstanceType<typeof Hyperbrowser>,
-    private openai: OpenAI
+    private llm: LLMInterface,
   ) {}
 
   private async generateSearchQueries(query: ResearchQuery): Promise<string[]> {
-    const response = await this.openai.beta.chat.completions.parse({
-      model: "o3-mini",
-      reasoning_effort: "high",
+    const response = await this.llm.chatFormat({
       messages: [
         {
           role: "system",
@@ -33,29 +32,30 @@ export class SearchModule {
           content: `Research Query: ${JSON.stringify(
             query,
             null,
-            2
+            2,
           )}\n\nGenerate search queries that would help find relevant information.`,
         },
       ],
-      response_format: zodResponseFormat(SearchQueriesSchema, "SearchQueries"),
+      format: SearchQueriesSchema,
     });
 
-    usageTracker.trackUsage({
-      model: "o3-mini",
-      tokens: {
-        prompt_tokens: response.usage?.prompt_tokens || 0,
-        completion_tokens: response.usage?.completion_tokens || 0,
-        total_tokens: response.usage?.total_tokens || 0,
-      },
-      module: "search",
-      operation: "generateSearchQueries",
-      timestamp: new Date(),
-    });
+    // usageTracker.trackUsage({
+    //   model: "o3-mini",
+    //   tokens: {
+    //     prompt_tokens: response.usage?.prompt_tokens || 0,
+    //     completion_tokens: response.usage?.completion_tokens || 0,
+    //     total_tokens: response.usage?.total_tokens || 0,
+    //   },
+    //   module: "search",
+    //   operation: "generateSearchQueries",
+    //   timestamp: new Date(),
+    // });
 
-    const queries = response.choices[0].message.parsed?.queries;
-    if (!queries) {
-      throw new Error("No search queries generated");
-    }
+    // const queries = response.choices[0].message.parsed?.queries;
+    // if (!queries) {
+    //   throw new Error("No search queries generated");
+    // }
+    const queries = response.content.queries;
 
     console.log("\n\nSearch queries generated:");
     console.log(JSON.stringify(queries, null, 2));
@@ -65,7 +65,7 @@ export class SearchModule {
 
   private async searchGoogle(query: string): Promise<string[]> {
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(
-      query
+      query,
     )}`;
 
     const results = await this.hbClient.extract.startAndWait({
@@ -84,7 +84,7 @@ export class SearchModule {
     console.log(`Results: ${JSON.stringify(results, null, 2)}`);
 
     console.log(
-      `\n\nSearch results: ${JSON.stringify(results.data, null, 2)}\n\n`
+      `\n\nSearch results: ${JSON.stringify(results.data, null, 2)}\n\n`,
     );
 
     return (results.data as SearchResults).topSearchResutls
@@ -118,14 +118,14 @@ export class SearchModule {
   }
 
   async search(
-    query: ResearchQuery
+    query: ResearchQuery,
   ): Promise<Array<{ url: string; content: string }>> {
     // Generate search queries
     const searchQueries = await this.generateSearchQueries(query);
 
     // Collect all URLs from all queries
     const urlSets = await Promise.all(
-      searchQueries.map((q) => this.searchGoogle(q))
+      searchQueries.map((q) => this.searchGoogle(q)),
     );
     const uniqueUrls = [...new Set(urlSets.flat())];
 
@@ -134,7 +134,7 @@ export class SearchModule {
       uniqueUrls.map(async (url) => {
         const content = await this.scrapeUrl(url);
         return { url, content };
-      })
+      }),
     );
 
     // Filter out failed scrapes
